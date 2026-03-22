@@ -31,7 +31,7 @@ export default function ChatWidget({ onClose }) {
     setInput("");
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:5000/api/chat", {
+      const res = await fetch("https://menumind-zuwu.onrender.com", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
