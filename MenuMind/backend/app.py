@@ -13,14 +13,7 @@ from neo4j import GraphDatabase
 
 
 app = Flask(__name__)
-@app.after_request
-def add_cors_headers(response):
-    response.headers["Access-Control-Allow-Origin"] = "https://menumind-1.onrender.com"
-    response.headers["Access-Control-Allow-Methods"] = "GET,HEAD,OPTIONS,POST,PUT,DELETE"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    return response
-CORS(app)
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 client = Perplexity(
     api_key=os.getenv("PERPLEXITY_API_KEY")
