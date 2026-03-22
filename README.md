@@ -73,6 +73,8 @@ MenuMind/
     └── src/
         ├── App.jsx
         └── ChatWidget.jsx
+        └── AdminDashboard.jsx
+        └──main.jsx
 ```
 
 ---
