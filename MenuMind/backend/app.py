@@ -18,6 +18,12 @@ gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 client = Perplexity(
     api_key=os.getenv("PERPLEXITY_API_KEY")
 )
+
+neo4j_driver = GraphDatabase.driver(
+    os.getenv("NEO4J_URI"),
+    auth=(os.getenv("NEO4J_USER"), os.getenv("NEO4J_PASSWORD")),
+    database=os.getenv("NEO4J_DATABASE"),
+)
 # LLM prompt to paraphrase user message, aswer queries based on the menu and extract relevant dishes from menu
 def llm_paraphrase(user_message, full_menu):
     try:
