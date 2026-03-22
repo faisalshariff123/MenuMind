@@ -2,7 +2,7 @@
 
 **Live demo → [menumind-1.onrender.com](https://menumind-1.onrender.com)**
 
-Restaurant owners spend way too much time answering the same questions — "do you have anything vegan?", "what's gluten free?", "what can I get under $15?". MenuMind lets them upload their menu once and get an AI chatbot they can embed on their site that handles all of that automatically.
+Restaurant owners spend way too much time answering the same questions — "do you have anything vegan?", "what's gluten free?", "what can I get under $15?". MenuMind lets them upload their menu once and get an RAG AI chatbot they can embed on their site that handles all of that automatically.
 
 Built at Hack Hayward 2026 in about 19 hours.
 
