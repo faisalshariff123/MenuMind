@@ -1,5 +1,5 @@
 // src/App.jsx
-import ChatWidget from './ChatWidget';
+import ChatWidget from './Chatwidget';
 import AdminDashboard from './AdminDashboard';
 
 function App() {
