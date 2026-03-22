@@ -9,3 +9,4 @@ Pillow
 qrcode
 perplexityai
 pdfplumber
+gunicorn
