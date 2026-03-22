@@ -5,10 +5,9 @@ import AdminDashboard from './AdminDashboard';
 function App() {
   // Simple check to see if we are on the admin site or the customer site
   const path = window.location.pathname;
-
-  if (path === '/admin') {
-    return <AdminDashboard />;
-  }
+if (path.startsWith('/admin')) {
+  return <AdminDashboard />;
+}
 
   // --- CUSTOMER VIEW ---
   return (
