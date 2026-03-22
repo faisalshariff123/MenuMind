@@ -1,0 +1,9 @@
+flask
+flask-cors
+neo4j
+google-generativeai
+requests
+pdfplumber
+python-dotenv
+Pillow
+qrcode
