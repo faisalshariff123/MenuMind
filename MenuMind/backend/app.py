@@ -161,7 +161,13 @@ def get_answer(user_message, restaurant_id):
     menu = load_menu_from_neo4j(restaurant_id)
     return llm_paraphrase(user_message, menu)
 
-
+@app.route("/api/upload-menu", methods=["OPTIONS"])
+def upload_menu_preflight():
+    response = jsonify({})
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+    return response, 200
 @app.route("/api/upload-menu", methods=["POST"])
 def upload_menu():
     if gemini_client is None:
@@ -236,7 +242,13 @@ def upload_menu():
         print("Upload Error:", e)
         return jsonify({"error": "Failed to parse menu: " + str(e)}), 500
 
-
+@app.route("/api/chat", methods=["OPTIONS"])
+def chat_preflight():
+    response = jsonify({})
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+    return response, 200
 @app.route("/api/chat", methods=["POST"])
 def chat():
     data = request.get_json()
