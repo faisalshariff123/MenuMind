@@ -1,8 +1,16 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from perplexity import Perplexity
 
 app = Flask(__name__)
 CORS(app)
+
+client = Perplexity()
+response = client.responses.create(
+    model="openai/gpt-5.4",
+    input=""
+    instructions="You are a helpful assistant for a restaurant menu. Answer questions about dishes, prices, categories, and allergens based on the provided menu data.",
+)
 
 # Hardcoded menu for now — swap with Neo4j later
 menu = [
