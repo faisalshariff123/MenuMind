@@ -34,8 +34,9 @@ def llm_paraphrase(user_message, found_dishes):
                     ),
                 },
             ],
+            disable_search=True,
         )
-        return resp.output_text.strip()
+        return resp.choices[0].message.content.strip()
     except Exception as e:
         print("Perplexity error:", e)
         return "Whoops! Having some trouble thinking right now, but we do have some great options for you."
