@@ -24,6 +24,7 @@ neo4j_driver = GraphDatabase.driver(
     auth=(os.getenv("NEO4J_USER"), os.getenv("NEO4J_PASSWORD")),
     database=os.getenv("NEO4J_DATABASE"),
 )
+
 # LLM prompt to paraphrase user message, aswer queries based on the menu and extract relevant dishes from menu
 def llm_paraphrase(user_message, full_menu):
     try:
@@ -35,7 +36,7 @@ def llm_paraphrase(user_message, full_menu):
                     "content": (
                         "You are a friendly waiter. "
                         "You have been given the full restaurant menu as JSON. "
-                        "Answer the customer's question using ONLY the dishes in that JSON. "
+                        "Answer the customer's question using ONLY the dishes in that JSON. And do NOT make the characters or words BOLD. "
                         "Filter, compare, recommend, and explain dishes based on what the customer asks. "
                         "Do NOT invent dishes, prices, ingredients, or allergens not present in the JSON. "
                         "If no dishes match the customer's request, say so honestly."
@@ -57,7 +58,7 @@ def llm_paraphrase(user_message, full_menu):
         return "Whoops! Having some trouble thinking right now."
 
 
-# Hardcoded menu for now, swap with Neo4j later
+# Hardcoded menu but decided it was lame
 #menu = [
     #{"name": "Vegan Bowl", "price": 12.50, "category": "Vegan", "allergens": [], "description": "Quinoa, veggies, tofu"},
     #{"name": "Pasta Primavera", "price": 14.00, "category": "Pasta", "allergens": ["gluten"], "description": "Fresh pasta, seasonal vegetables"},
@@ -123,7 +124,8 @@ def load_menu_from_neo4j(restaurant_id):
         )
         return [dict(record) for record in result]
 
-def get_answer(user_message):
+def get_answer(user_message, restaurant_id):
+    menu = load_menu_from_neo4j(restaurant_id)
     return llm_paraphrase(user_message, menu)  
 
 @app.route("/api/upload-menu", methods=["POST"])
@@ -191,6 +193,8 @@ def upload_menu():
 
         menu = normalized_menu
 
+        save_menu_to_neo4j(restaurant_id, menu)
+
         return jsonify({
             "status": "ok",
             "message": f"Successfully loaded {len(menu)} dishes from {filename}!",
@@ -205,14 +209,17 @@ def upload_menu():
 def chat():
     data = request.get_json()
     user_message = data.get("message", "")
-    answer = get_answer(user_message)
+    restaurant_id = data.get("restaurant_id", "demo-1")
+    answer = get_answer(user_message, restaurant_id)
     return jsonify({"answer": answer})
 
 
 @app.route("/api/dishes", methods=["GET"])
 def dishes():
+    restaurant_id = request.args.get("restaurant_id", "demo-1")
+    menu = load_menu_from_neo4j(restaurant_id)
     return jsonify(menu)
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(debug=True, use_reloader=False, port=5000)
