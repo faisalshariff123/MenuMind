@@ -25,7 +25,7 @@ export default function AdminDashboard() {
     formData.append("restaurant_id", restaurantId);
 
     try {
-      const res = await fetch("http://localhost:5000/api/upload-menu", {
+      const res = await fetch("https://menumind-zuwu.onrender.com/api/upload-menu", {
         method: "POST",
         body: formData, 
       });
