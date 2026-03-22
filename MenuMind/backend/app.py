@@ -1,8 +1,42 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from perplexity import Perplexity
+import os
+
 
 app = Flask(__name__)
 CORS(app)
+
+client = Perplexity(
+    api_key=os.getenv("PERPLEXITY_API_KEY")
+)
+# LLM prompt to paraphrase user message and extract relevant dishes from menu
+def llm_paraphrase(user_message, found_dishes):
+    try:
+        resp = client.responses.create(
+            model="sonar", 
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a friendly waiter for a restaurant called MenuMind. "
+                        "Using ONLY the dishes provided as JSON, answer clearly. "
+                        "Do NOT invent dishes, ingredients, or prices."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"User question: {user_message}\n\n"
+                        f"Relevant dishes (JSON): {found_dishes}"
+                    ),
+                },
+            ],
+        )
+        return resp.output_text.strip()
+    except Exception as e:
+        print("Perplexity error:", e)
+        return "Whoops! Having some trouble thinking right now, but we do have some great options for you."
 
 # Hardcoded menu for now — swap with Neo4j later
 menu = [
@@ -12,18 +46,20 @@ menu = [
     {"name": "Grilled Salmon", "price": 18.00, "category": "Seafood", "allergens": ["fish"], "description": "Atlantic salmon, lemon butter"},
     {"name": "Cheese Pizza", "price": 10.00, "category": "Pizza", "allergens": ["gluten", "dairy"], "description": "Classic margherita"},
 ]
-
+# Basic rule-based parsing to find relevant dishes based on user message patterns
 def get_answer(user_message):
     msg = user_message.lower()
+    found_dishes = []
 
     # Pattern: cheapest + category
     for cat in ["vegan", "pasta", "pizza", "seafood"]:
         if "cheapest" in msg and cat in msg:
             filtered = [d for d in menu if d["category"].lower() == cat]
             if filtered:
-                dish = min(filtered, key=lambda x: x["price"])
-                return f"Our cheapest {cat} dish is {dish['name']} at ${dish['price']:.2f}. {dish['description']}."
+                cheapest = min(filtered, key=lambda x: x["price"])
+                found_dishes.append(cheapest)
 
+            return llm_paraphrase(user_message, found_dishes)
     # Pattern: under $X
     for word in msg.split():
         if word.replace("$", "").replace(".", "").isdigit():
@@ -31,8 +67,8 @@ def get_answer(user_message):
             filtered = [d for d in menu if d["price"] <= max_price]
             if filtered:
                 filtered.sort(key=lambda x: x["price"])
-                names = ", ".join(f"{d['name']} (${d['price']:.2f})" for d in filtered)
-                return f"Dishes under ${max_price:.0f}: {names}."
+                found_dishes = filtered
+            return llm_paraphrase(user_message, found_dishes)
 
     # Pattern: allergen exclusion
     allergens_to_avoid = []
@@ -42,20 +78,18 @@ def get_answer(user_message):
     if allergens_to_avoid:
         filtered = [d for d in menu if not any(a in d["allergens"] for a in allergens_to_avoid)]
         if filtered:
-            names = ", ".join(d["name"] for d in filtered)
-            return f"Dishes without {', '.join(allergens_to_avoid)}: {names}."
+            found_dishes = filtered
+        return llm_paraphrase(user_message, found_dishes)
 
     # Pattern: show category
     for cat in ["vegan", "pasta", "pizza", "seafood"]:
         if cat in msg:
             filtered = [d for d in menu if d["category"].lower() == cat]
             if filtered:
-                names = ", ".join(f"{d['name']} (${d['price']:.2f})" for d in filtered)
-                return f"Our {cat} dishes: {names}."
+                found_dishes = filtered
+            return llm_paraphrase(user_message, found_dishes)
 
-    return "I can help you find vegan options, dishes under a price, or filter by allergens. Try asking something like 'cheapest vegan dish' or 'no nuts'!"
-
-
+    return llm_paraphrase(user_message, found_dishes)
 @app.route("/api/chat", methods=["POST"])
 def chat():
     data = request.get_json()
