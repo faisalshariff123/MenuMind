@@ -65,7 +65,49 @@ def llm_paraphrase(user_message, full_menu):
     #{"name": "Grilled Salmon", "price": 18.00, "category": "Seafood", "allergens": ["fish"], "description": "Atlantic salmon, lemon butter"},
     #{"name": "Cheese Pizza", "price": 10.00, "category": "Pizza", "allergens": ["gluten", "dairy"], "description": "Classic margherita"},
 #]
-menu = []
+#menu = []
+def save_menu_to_neo4j(restaurant_id, dishes):
+    def _tx_save(tx, rid, dishes_list):
+        # Remove old dishes for this restaurant
+        tx.run(
+            """
+            MATCH (r:Restaurant {id: $rid})-[:HAS_DISH]->(d:Dish)
+            DETACH DELETE d
+            """,
+            rid=rid,
+        )
+
+        # Ensure restaurant node exists
+        tx.run(
+            """
+            MERGE (r:Restaurant {id: $rid})
+            """,
+            rid=rid,
+        )
+
+        # Create new dishes
+        for d in dishes_list:
+            tx.run(
+                """
+                MATCH (r:Restaurant {id: $rid})
+                CREATE (r)-[:HAS_DISH]->(:Dish {
+                    name: $name,
+                    price: $price,
+                    category: $category,
+                    allergens: $allergens,
+                    description: $description
+                })
+                """,
+                rid=rid,
+                name=d["name"],
+                price=d["price"],
+                category=d["category"],
+                allergens=d["allergens"],
+                description=d["description"],
+            )
+
+    with neo4j_driver.session() as session:
+        session.execute_write(_tx_save, restaurant_id, dishes)
 # Basic rule-based parsing to find relevant dishes based on user message patterns
 def get_answer(user_message):
     return llm_paraphrase(user_message, menu)  # where menu comes from Gemini/Neo4j now
