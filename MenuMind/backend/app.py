@@ -13,7 +13,7 @@ from neo4j import GraphDatabase
 
 
 app = Flask(__name__)
-CORS(app, 
+CORS(app,
      origins=["https://menumind-1.onrender.com", "*"],
      allow_headers=["Content-Type", "Authorization"],
      methods=["GET", "POST", "OPTIONS"],
@@ -25,23 +25,46 @@ def after_request(response):
     response.headers["Access-Control-Allow-Headers"] = "Content-Type"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     return response
-gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-client = Perplexity(
-    api_key=os.getenv("PERPLEXITY_API_KEY")
-)
 
-neo4j_driver = GraphDatabase.driver(
-    os.getenv("NEO4J_URI"),
-    auth=(os.getenv("NEO4J_USER"), os.getenv("NEO4J_PASSWORD")),
-    database=os.getenv("NEO4J_DATABASE"),
-)
+# --- Safe client initialization (won't crash on missing env vars) ---
+try:
+    gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+except Exception as e:
+    print("Gemini init failed:", e)
+    gemini_client = None
+
+try:
+    perplexity_client = Perplexity(api_key=os.getenv("PERPLEXITY_API_KEY"))
+except Exception as e:
+    print("Perplexity init failed:", e)
+    perplexity_client = None
+
+try:
+    neo4j_driver = GraphDatabase.driver(
+        os.getenv("NEO4J_URI"),
+        auth=(os.getenv("NEO4J_USER"), os.getenv("NEO4J_PASSWORD")),
+        database=os.getenv("NEO4J_DATABASE"),
+    )
+except Exception as e:
+    print("Neo4j connection failed:", e)
+    neo4j_driver = None
+
+
 @app.route("/api/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok"})
-# LLM prompt to paraphrase user message, aswer queries based on the menu and extract relevant dishes from menu
+    return jsonify({
+        "status": "ok",
+        "gemini": gemini_client is not None,
+        "perplexity": perplexity_client is not None,
+        "neo4j": neo4j_driver is not None,
+    })
+
+
 def llm_paraphrase(user_message, full_menu):
+    if perplexity_client is None:
+        return "AI service unavailable — missing API key."
     try:
-        resp = client.chat.completions.create(
+        resp = perplexity_client.chat.completions.create(
             model="sonar",
             messages=[
                 {
@@ -71,18 +94,12 @@ def llm_paraphrase(user_message, full_menu):
         return "Whoops! Having some trouble thinking right now."
 
 
-# Hardcoded menu but decided it was lame
-#menu = [
-    #{"name": "Vegan Bowl", "price": 12.50, "category": "Vegan", "allergens": [], "description": "Quinoa, veggies, tofu"},
-    #{"name": "Pasta Primavera", "price": 14.00, "category": "Pasta", "allergens": ["gluten"], "description": "Fresh pasta, seasonal vegetables"},
-    #{"name": "Nut Burger", "price": 11.00, "category": "Vegan", "allergens": ["nuts"], "description": "Plant-based patty with cashew sauce"},
-    #{"name": "Grilled Salmon", "price": 18.00, "category": "Seafood", "allergens": ["fish"], "description": "Atlantic salmon, lemon butter"},
-    #{"name": "Cheese Pizza", "price": 10.00, "category": "Pizza", "allergens": ["gluten", "dairy"], "description": "Classic margherita"},
-#]
-#menu = []
 def save_menu_to_neo4j(restaurant_id, dishes):
+    if neo4j_driver is None:
+        print("Neo4j unavailable — skipping save.")
+        return
+
     def _tx_save(tx, rid, dishes_list):
-        # Remove old dishes for this restaurant
         tx.run(
             """
             MATCH (r:Restaurant {id: $rid})-[:HAS_DISH]->(d:Dish)
@@ -90,16 +107,12 @@ def save_menu_to_neo4j(restaurant_id, dishes):
             """,
             rid=rid,
         )
-
-        # Ensure restaurant node exists
         tx.run(
             """
             MERGE (r:Restaurant {id: $rid})
             """,
             rid=rid,
         )
-
-        # Create new dishes
         for d in dishes_list:
             tx.run(
                 """
@@ -122,7 +135,13 @@ def save_menu_to_neo4j(restaurant_id, dishes):
 
     with neo4j_driver.session() as session:
         session.execute_write(_tx_save, restaurant_id, dishes)
+
+
 def load_menu_from_neo4j(restaurant_id):
+    if neo4j_driver is None:
+        print("Neo4j unavailable — returning empty menu.")
+        return []
+
     with neo4j_driver.session() as session:
         result = session.run(
             """
@@ -137,12 +156,17 @@ def load_menu_from_neo4j(restaurant_id):
         )
         return [dict(record) for record in result]
 
+
 def get_answer(user_message, restaurant_id):
     menu = load_menu_from_neo4j(restaurant_id)
-    return llm_paraphrase(user_message, menu)  
+    return llm_paraphrase(user_message, menu)
+
 
 @app.route("/api/upload-menu", methods=["POST"])
 def upload_menu():
+    if gemini_client is None:
+        return jsonify({"error": "Gemini API key not configured on server."}), 500
+
     restaurant_id = request.form.get("restaurant_id", "demo-1")
 
     if "file" not in request.files:
@@ -155,7 +179,6 @@ def upload_menu():
     filename = file.filename.lower()
     file_bytes = file.read()
 
-    # Determine mime type based on extension
     if filename.endswith(".pdf"):
         mime_type = "application/pdf"
     elif filename.endswith(".png"):
@@ -176,7 +199,6 @@ def upload_menu():
         - "description" (string)
         Output ONLY the raw JSON array. No markdown, no codeblocks, no explanations.
         """
-# Teh above code block tells mr. gemini to extract dishes from the menu and return it in a json format
         resp = gemini_client.models.generate_content(
             model="gemini-2.5-flash",
             contents=[
@@ -193,7 +215,6 @@ def upload_menu():
 
         extracted_dishes = json.loads(raw_text)
 
-        # Ensure each dish has the fields we expect
         normalized_menu = []
         for d in extracted_dishes:
             normalized_menu.append({
@@ -204,20 +225,18 @@ def upload_menu():
                 "description": d.get("description", ""),
             })
 
-        menu = normalized_menu
-
-        save_menu_to_neo4j(restaurant_id, menu)
+        save_menu_to_neo4j(restaurant_id, normalized_menu)
 
         return jsonify({
             "status": "ok",
-            "message": f"Successfully loaded {len(menu)} dishes from {filename}!",
-            "menu": menu,
+            "message": f"Successfully loaded {len(normalized_menu)} dishes from {filename}!",
+            "menu": normalized_menu,
         })
     except Exception as e:
         print("Upload Error:", e)
         return jsonify({"error": "Failed to parse menu: " + str(e)}), 500
 
-    
+
 @app.route("/api/chat", methods=["POST"])
 def chat():
     data = request.get_json()
