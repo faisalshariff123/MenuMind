@@ -2,6 +2,8 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from perplexity import Perplexity
 import os
+from dotenv import load_dotenv
+load_dotenv()
 
 
 app = Flask(__name__)
@@ -10,10 +12,10 @@ CORS(app)
 client = Perplexity(
     api_key=os.getenv("PERPLEXITY_API_KEY")
 )
-# LLM prompt to paraphrase user message and extract relevant dishes from menu
+# LLM prompt to paraphrase user message, aswer queries based on the menu and extract relevant dishes from menu
 def llm_paraphrase(user_message, found_dishes):
     try:
-        resp = client.responses.create(
+        resp = client.chat.completions.create(
             model="sonar", 
             messages=[
                 {
