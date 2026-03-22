@@ -9,7 +9,6 @@ function App() {
   if (isAdmin) {
     return <AdminDashboard />;
   }
-}
 
 
   // --- CUSTOMER VIEW ---
