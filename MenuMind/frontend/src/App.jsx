@@ -3,11 +3,14 @@ import ChatWidget from './Chatwidget';
 import AdminDashboard from './AdminDashboard';
 
 function App() {
-  // Simple check to see if we are on the admin site or the customer site
-  const path = window.location.pathname;
-if (path.startsWith('/admin')) {
-  return <AdminDashboard />;
+  const params = new URLSearchParams(window.location.search);
+  const isAdmin = params.get('admin') === '1';
+
+  if (isAdmin) {
+    return <AdminDashboard />;
+  }
 }
+
 
   // --- CUSTOMER VIEW ---
   return (
@@ -134,11 +137,13 @@ if (path.startsWith('/admin')) {
         </div>
         
         {/* NEW: Bottom Left Admin Link */}
-        <a href="/admin" className="admin-cta">
+        <a href="/?admin=1" className="admin-cta">
           <p className="admin-cta-title">⚙️ SYSTEM SETTINGS</p>
           <p className="admin-cta-text">Want your own Menu bot?</p>
           <p className="admin-cta-text">Click to access Admin Panel</p>
         </a>
+      
+
 
         {/* The widget sits on top of the customer site */}
         <div className="chat-container">
