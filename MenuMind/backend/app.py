@@ -206,7 +206,7 @@ def upload_menu():
         Output ONLY the raw JSON array. No markdown, no codeblocks, no explanations.
         """
         resp = gemini_client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-1.5-flash",
             contents=[
                 prompt,
                 types.Part.from_bytes(data=file_bytes, mime_type=mime_type),
