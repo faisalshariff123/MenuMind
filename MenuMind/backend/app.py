@@ -60,77 +60,7 @@ def llm_paraphrase(user_message, full_menu):
 menu = []
 # Basic rule-based parsing to find relevant dishes based on user message patterns
 def get_answer(user_message):
-    msg = user_message.lower()
-    found_dishes = []
-
-    # 1) Name-based keyword search (burger, fish, salmon)
-    keywords = []
-    if "burger" in msg:
-        keywords.append("burger")
-    if "fish" in msg:
-        keywords.append("fish")
-    if "salmon" in msg:
-        keywords.append("salmon")
-    if "vegetarian" in msg:
-        keywords.append("vegetarian")
-
-    if keywords:
-        for d in menu:
-            name_l = d["name"].lower()
-            # match if any keyword appears in the dish name
-            if any(k in name_l for k in keywords):
-                found_dishes.append(d)
-        if found_dishes:
-            return llm_paraphrase(user_message, found_dishes)
-
-    # 2) Pattern: cheapest + category
-    for cat in ["vegan", "pasta", "pizza", "seafood"]:
-        if "cheapest" in msg and cat in msg:
-            filtered = [d for d in menu if d["category"].lower() == cat]
-            if filtered:
-                cheapest = min(filtered, key=lambda x: x["price"])
-                found_dishes.append(cheapest)
-            return llm_paraphrase(user_message, found_dishes)
-
-    # 3) Pattern: under $X
-    for word in msg.split():
-        if word.replace("$", "").replace(".", "").isdigit():
-            max_price = float(word.replace("$", ""))
-            filtered = [d for d in menu if d["price"] <= max_price]
-            if filtered:
-                filtered.sort(key=lambda x: x["price"])
-                found_dishes = filtered
-            return llm_paraphrase(user_message, found_dishes)
-
-    # 4) Pattern: allergen exclusion
-    allergens_to_avoid = []
-    for allergen in ["nuts", "gluten", "dairy", "fish"]:
-        if f"no {allergen}" in msg or f"{allergen} free" in msg or f"without {allergen}" in msg:
-            allergens_to_avoid.append(allergen)
-    if allergens_to_avoid:
-        filtered = [d for d in menu if not any(a in d["allergens"] for a in allergens_to_avoid)]
-        if filtered:
-            found_dishes = filtered
-        return llm_paraphrase(user_message, found_dishes)
-
-    # 5) Pattern: show category
-    for cat in ["vegan", "pasta", "pizza", "seafood"]:
-        if cat in msg:
-            filtered = [d for d in menu if d["category"].lower() == cat]
-            if filtered:
-                found_dishes = filtered
-            return llm_paraphrase(user_message, found_dishes)
-
-    # 6) Fallback when nothing matched
-    if not found_dishes:
-        if menu:
-            names = ", ".join(d["name"] for d in menu)
-            return (
-                "I can only answer questions about the dishes in this menu: "
-                f"{names}. Try asking about these by name, price, or allergens."
-            )
-        else:
-            return "I don't have any dishes loaded yet. Please upload a menu first."
+    return llm_paraphrase(user_message, menu)  # where menu comes from Gemini/Neo4j now
 
 @app.route("/api/upload-menu", methods=["POST"])
 def upload_menu():
