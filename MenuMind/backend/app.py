@@ -6,7 +6,9 @@ from dotenv import load_dotenv
 load_dotenv()
 import pdfplumber
 from werkzeug.utils import secure_filename
-
+from google import genai
+from google.genai import types
+import json
 
 app = Flask(__name__)
 CORS(app)
@@ -15,24 +17,27 @@ client = Perplexity(
     api_key=os.getenv("PERPLEXITY_API_KEY")
 )
 # LLM prompt to paraphrase user message, aswer queries based on the menu and extract relevant dishes from menu
-def llm_paraphrase(user_message, found_dishes):
+def llm_paraphrase(user_message, full_menu):
     try:
         resp = client.chat.completions.create(
-            model="sonar", 
+            model="sonar",
             messages=[
                 {
                     "role": "system",
                     "content": (
-                        "You are a friendly waiter for a restaurant called MenuMind. "
-                        "Using ONLY the dishes provided as JSON, answer clearly. "
-                        "Do NOT invent dishes, ingredients, or prices."
+                        "You are a friendly waiter. "
+                        "You have been given the full restaurant menu as JSON. "
+                        "Answer the customer's question using ONLY the dishes in that JSON. "
+                        "Filter, compare, recommend, and explain dishes based on what the customer asks. "
+                        "Do NOT invent dishes, prices, ingredients, or allergens not present in the JSON. "
+                        "If no dishes match the customer's request, say so honestly."
                     ),
                 },
                 {
                     "role": "user",
                     "content": (
-                        f"User question: {user_message}\n\n"
-                        f"Relevant dishes (JSON): {found_dishes}"
+                        f"Customer question: {user_message}\n\n"
+                        f"Full menu (JSON): {full_menu}"
                     ),
                 },
             ],
@@ -41,16 +46,18 @@ def llm_paraphrase(user_message, found_dishes):
         return resp.choices[0].message.content.strip()
     except Exception as e:
         print("Perplexity error:", e)
-        return "Whoops! Having some trouble thinking right now, but we do have some great options for you."
+        return "Whoops! Having some trouble thinking right now."
+
 
 # Hardcoded menu for now — swap with Neo4j later
-menu = [
-    {"name": "Vegan Bowl", "price": 12.50, "category": "Vegan", "allergens": [], "description": "Quinoa, veggies, tofu"},
-    {"name": "Pasta Primavera", "price": 14.00, "category": "Pasta", "allergens": ["gluten"], "description": "Fresh pasta, seasonal vegetables"},
-    {"name": "Nut Burger", "price": 11.00, "category": "Vegan", "allergens": ["nuts"], "description": "Plant-based patty with cashew sauce"},
-    {"name": "Grilled Salmon", "price": 18.00, "category": "Seafood", "allergens": ["fish"], "description": "Atlantic salmon, lemon butter"},
-    {"name": "Cheese Pizza", "price": 10.00, "category": "Pizza", "allergens": ["gluten", "dairy"], "description": "Classic margherita"},
-]
+#menu = [
+    #{"name": "Vegan Bowl", "price": 12.50, "category": "Vegan", "allergens": [], "description": "Quinoa, veggies, tofu"},
+    #{"name": "Pasta Primavera", "price": 14.00, "category": "Pasta", "allergens": ["gluten"], "description": "Fresh pasta, seasonal vegetables"},
+    #{"name": "Nut Burger", "price": 11.00, "category": "Vegan", "allergens": ["nuts"], "description": "Plant-based patty with cashew sauce"},
+    #{"name": "Grilled Salmon", "price": 18.00, "category": "Seafood", "allergens": ["fish"], "description": "Atlantic salmon, lemon butter"},
+    #{"name": "Cheese Pizza", "price": 10.00, "category": "Pizza", "allergens": ["gluten", "dairy"], "description": "Classic margherita"},
+#]
+menu = []
 # Basic rule-based parsing to find relevant dishes based on user message patterns
 def get_answer(user_message):
     msg = user_message.lower()
@@ -116,18 +123,19 @@ def get_answer(user_message):
 
     # 6) Fallback when nothing matched
     if not found_dishes:
-        return (
-            "I can only answer questions about the dishes in this menu: "
-            "Vegan Bowl, Pasta Primavera, Nut Burger, Grilled Salmon, and Cheese Pizza. "
-            "Try asking about these by name, price, or allergens."
-        )
-
-    return llm_paraphrase(user_message, found_dishes)
+        if menu:
+            names = ", ".join(d["name"] for d in menu)
+            return (
+                "I can only answer questions about the dishes in this menu: "
+                f"{names}. Try asking about these by name, price, or allergens."
+            )
+        else:
+            return "I don't have any dishes loaded yet. Please upload a menu first."
 
 @app.route("/api/upload-menu", methods=["POST"])
 def upload_menu():
-    global menu # Tell Python we are modifying the global menu variable
-    
+    global menu  # we really are updating the global
+
     if "file" not in request.files:
         return jsonify({"error": "No file part"}), 400
 
@@ -135,11 +143,20 @@ def upload_menu():
     if file.filename == "":
         return jsonify({"error": "No selected file"}), 400
 
-    try:
-        file_bytes = file.read()
-        # Gemini accepts native PDFs and images
-        mime_type = "application/pdf" if file.filename.lower().endswith(".pdf") else "image/jpeg"
+    filename = file.filename.lower()
+    file_bytes = file.read()
 
+    # Determine mime type based on extension
+    if filename.endswith(".pdf"):
+        mime_type = "application/pdf"
+    elif filename.endswith(".png"):
+        mime_type = "image/png"
+    elif filename.endswith(".jpg") or filename.endswith(".jpeg"):
+        mime_type = "image/jpeg"
+    else:
+        return jsonify({"error": "Unsupported file type"}), 400
+
+    try:
         prompt = """
         Read this restaurant menu. Extract all dishes into a valid JSON array.
         Each dish must be an object with exactly these keys:
@@ -152,27 +169,43 @@ def upload_menu():
         """
 
         resp = gemini_client.models.generate_content(
-            model="gemini-2.0-flash", 
-            contents=[prompt, types.Part.from_bytes(data=file_bytes, mime_type=mime_type)]
+            model="gemini-2.5-flash",
+            contents=[
+                prompt,
+                types.Part.from_bytes(data=file_bytes, mime_type=mime_type),
+            ],
         )
 
-        # Clean output in case Gemini adds ```json
         raw_text = resp.text.strip()
-        if raw_text.startswith("```json"): raw_text = raw_text[7:-3].strip()
-        elif raw_text.startswith("```"): raw_text = raw_text[3:-3].strip()
+        if raw_text.startswith("```json"):
+            raw_text = raw_text[7:-3].strip()
+        elif raw_text.startswith("```"):
+            raw_text = raw_text[3:-3].strip()
 
-        # Parse JSON and update the global menu!
         extracted_dishes = json.loads(raw_text)
-        menu = extracted_dishes 
+
+        # Ensure each dish has the fields we expect
+        normalized_menu = []
+        for d in extracted_dishes:
+            normalized_menu.append({
+                "name": d.get("name", "").strip(),
+                "price": float(d.get("price", 0)),
+                "category": d.get("category", "Other"),
+                "allergens": d.get("allergens", []),
+                "description": d.get("description", ""),
+            })
+
+        menu = normalized_menu
 
         return jsonify({
-            "status": "ok", 
-            "message": f"Successfully loaded {len(menu)} dishes!",
-            "menu": menu
+            "status": "ok",
+            "message": f"Successfully loaded {len(menu)} dishes from {filename}!",
+            "menu": menu,
         })
     except Exception as e:
         print("Upload Error:", e)
-        return jsonify({"error": "Failed to parse menu: " + str(e)}), 50
+        return jsonify({"error": "Failed to parse menu: " + str(e)}), 500
+
     
 @app.route("/api/chat", methods=["POST"])
 def chat():
