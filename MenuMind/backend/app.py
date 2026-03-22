@@ -13,7 +13,18 @@ from neo4j import GraphDatabase
 
 
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": "*"}})
+CORS(app, 
+     origins=["https://menumind-1.onrender.com", "*"],
+     allow_headers=["Content-Type", "Authorization"],
+     methods=["GET", "POST", "OPTIONS"],
+     supports_credentials=False)
+
+@app.after_request
+def after_request(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    return response
 gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 client = Perplexity(
     api_key=os.getenv("PERPLEXITY_API_KEY")
@@ -24,7 +35,9 @@ neo4j_driver = GraphDatabase.driver(
     auth=(os.getenv("NEO4J_USER"), os.getenv("NEO4J_PASSWORD")),
     database=os.getenv("NEO4J_DATABASE"),
 )
-
+@app.route("/api/health", methods=["GET"])
+def health():
+    return jsonify({"status": "ok"})
 # LLM prompt to paraphrase user message, aswer queries based on the menu and extract relevant dishes from menu
 def llm_paraphrase(user_message, full_menu):
     try:
