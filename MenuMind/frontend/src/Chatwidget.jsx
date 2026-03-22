@@ -18,6 +18,9 @@ export default function ChatWidget({ onClose }) {
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
+  // hardcode for now; must match what you use on upload
+  const restaurantId = "demo-1";
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
@@ -31,7 +34,10 @@ export default function ChatWidget({ onClose }) {
       const res = await fetch("http://localhost:5000/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({
+          message: text,
+          restaurant_id: restaurantId,
+        }),
       });
       const data = await res.json();
       setMessages((prev) => [...prev, { from: "bot", text: data.answer }]);
@@ -48,79 +54,80 @@ export default function ChatWidget({ onClose }) {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Silkscreen&family=VT323&display=swap');
 
         .mm-widget {
           display: flex;
           flex-direction: column;
           width: 380px;
           height: 560px;
-          border-radius: 20px;
           overflow: hidden;
-          font-family: 'DM Sans', sans-serif;
+          font-family: 'VT323', monospace;
           background: #faf8f4;
-          box-shadow: 0 24px 64px rgba(0,0,0,0.28), 0 4px 16px rgba(0,0,0,0.16);
-          animation: mm-rise 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+          border: 4px solid #1a1208;
+          box-shadow: 8px 8px 0px #1a1208;
+          animation: mm-rise 0.2s steps(4);
         }
         @keyframes mm-rise {
-          from { opacity: 0; transform: translateY(16px) scale(0.97); }
-          to   { opacity: 1; transform: translateY(0) scale(1); }
+          from { opacity: 0; transform: translateY(16px); }
+          to   { opacity: 1; transform: translateY(0); }
         }
 
         .mm-header {
-          background: #1a1208;
-          padding: 16px 20px 14px;
+          background: #c9965f;
+          padding: 12px 16px;
           display: flex;
           align-items: center;
           justify-content: space-between;
+          border-bottom: 4px solid #1a1208;
           flex-shrink: 0;
         }
         .mm-header-left {
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: 12px;
         }
         .mm-avatar {
-          width: 34px;
-          height: 34px;
-          background: #c9965f;
-          border-radius: 50%;
+          width: 36px;
+          height: 36px;
+          background: #faf8f4;
+          border: 2px solid #1a1208;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 16px;
+          font-size: 18px;
           flex-shrink: 0;
+          box-shadow: 2px 2px 0px #1a1208;
         }
         .mm-title {
-          font-family: 'Lora', serif;
-          font-size: 15px;
-          font-weight: 500;
-          color: #f0ebe0;
+          font-family: 'Silkscreen', cursive;
+          font-size: 16px;
+          color: #1a1208;
           margin: 0;
-          letter-spacing: 0.01em;
+          text-transform: uppercase;
         }
         .mm-subtitle {
-          font-size: 11px;
-          color: #9c8a6e;
-          margin: 1px 0 0;
-          letter-spacing: 0.03em;
+          font-size: 16px;
+          color: #1a1208;
+          margin: 0;
         }
         .mm-close {
-          background: rgba(255,255,255,0.08);
-          border: none;
-          color: #9c8a6e;
-          width: 28px;
-          height: 28px;
-          border-radius: 50%;
+          background: transparent;
+          border: 2px solid #1a1208;
+          background: #faf8f4;
+          color: #1a1208;
+          width: 32px;
+          height: 32px;
           cursor: pointer;
-          font-size: 16px;
+          font-family: 'Silkscreen', cursive;
+          font-size: 14px;
           display: flex;
           align-items: center;
           justify-content: center;
-          transition: background 0.15s, color 0.15s;
-          line-height: 1;
+          box-shadow: 2px 2px 0px #1a1208;
         }
-        .mm-close:hover { background: rgba(255,255,255,0.14); color: #f0ebe0; }
+        .mm-close:hover { background: #1a1208; color: #faf8f4; }
+        .mm-close:active { transform: translate(2px, 2px); box-shadow: none; }
 
         .mm-messages {
           flex: 1;
@@ -128,150 +135,140 @@ export default function ChatWidget({ onClose }) {
           padding: 18px 16px;
           display: flex;
           flex-direction: column;
-          gap: 10px;
+          gap: 14px;
           background: #faf8f4;
-          scrollbar-width: thin;
-          scrollbar-color: #ddd8cf transparent;
+          /* Pixel pattern background */
+          background-image: radial-gradient(#d3cdc1 2px, transparent 2px);
+          background-size: 16px 16px;
         }
 
         .mm-bubble {
           padding: 10px 14px;
-          border-radius: 16px;
           max-width: 82%;
-          font-size: 13.5px;
-          line-height: 1.55;
-          animation: mm-pop 0.22s ease-out;
-        }
-        @keyframes mm-pop {
-          from { opacity: 0; transform: translateY(6px); }
-          to   { opacity: 1; transform: translateY(0); }
+          font-size: 20px; /* VT323 needs to be larger for readability */
+          line-height: 1.2;
+          border: 2px solid #1a1208;
+          box-shadow: 4px 4px 0px #1a1208;
         }
         .mm-bubble.bot {
           background: #fff;
-          color: #2a2016;
-          border: 1px solid #ede9e2;
+          color: #1a1208;
           align-self: flex-start;
-          border-bottom-left-radius: 4px;
         }
         .mm-bubble.user {
-          background: #1a1208;
-          color: #f0ebe0;
+          background: #c9965f;
+          color: #1a1208;
           align-self: flex-end;
-          border-bottom-right-radius: 4px;
         }
         .mm-typing {
           display: flex;
-          gap: 4px;
+          gap: 6px;
           align-items: center;
           padding: 12px 14px;
         }
         .mm-dot {
-          width: 6px; height: 6px;
-          background: #c9965f;
-          border-radius: 50%;
-          animation: mm-bounce 1.2s infinite;
+          width: 8px; height: 8px;
+          background: #1a1208;
+          animation: mm-blink 1s steps(2, start) infinite;
         }
         .mm-dot:nth-child(2) { animation-delay: 0.2s; }
         .mm-dot:nth-child(3) { animation-delay: 0.4s; }
-        @keyframes mm-bounce {
-          0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
-          30% { transform: translateY(-5px); opacity: 1; }
+        @keyframes mm-blink {
+          0%, 100% { opacity: 0; }
+          50% { opacity: 1; }
         }
 
         .mm-chips {
           display: flex;
           flex-wrap: wrap;
-          gap: 6px;
-          padding: 10px 14px;
-          background: #f2ede6;
-          border-top: 1px solid #ede9e2;
+          gap: 8px;
+          padding: 12px 14px;
+          background: #c9965f;
+          border-top: 4px solid #1a1208;
           flex-shrink: 0;
         }
         .mm-chip {
-          background: #fff;
-          border: 1px solid #ded8cf;
-          border-radius: 100px;
-          padding: 5px 11px;
-          font-size: 11.5px;
+          background: #faf8f4;
+          border: 2px solid #1a1208;
+          padding: 6px 10px;
+          font-size: 16px;
           cursor: pointer;
-          color: #5a4e38;
-          font-family: 'DM Sans', sans-serif;
-          transition: background 0.15s, border-color 0.15s, color 0.15s;
-          white-space: nowrap;
+          color: #1a1208;
+          font-family: 'VT323', monospace;
+          box-shadow: 2px 2px 0px #1a1208;
           display: flex;
           align-items: center;
-          gap: 5px;
+          gap: 6px;
         }
         .mm-chip:hover {
           background: #1a1208;
-          border-color: #1a1208;
-          color: #f0ebe0;
+          color: #faf8f4;
+        }
+        .mm-chip:active {
+          transform: translate(2px, 2px);
+          box-shadow: none;
         }
 
         .mm-input-row {
           display: flex;
-          padding: 10px 12px;
-          gap: 8px;
-          background: #fff;
-          border-top: 1px solid #ede9e2;
+          padding: 12px;
+          gap: 10px;
+          background: #faf8f4;
+          border-top: 4px solid #1a1208;
           align-items: center;
           flex-shrink: 0;
         }
         .mm-input {
           flex: 1;
-          padding: 9px 14px;
-          border-radius: 100px;
-          border: 1px solid #ded8cf;
-          font-size: 13.5px;
-          background: #faf8f4;
-          color: #2a2016;
-          font-family: 'DM Sans', sans-serif;
+          padding: 10px;
+          border: 2px solid #1a1208;
+          font-size: 18px;
+          background: #fff;
+          color: #1a1208;
+          font-family: 'VT323', monospace;
           outline: none;
-          transition: border-color 0.15s;
+          box-shadow: inset 3px 3px 0px rgba(0,0,0,0.05);
         }
-        .mm-input::placeholder { color: #b0a898; }
-        .mm-input:focus { border-color: #c9965f; }
+        .mm-input::placeholder { color: #888; }
+        .mm-input:focus { background: #fffae6; }
+        
         .mm-send {
           background: #1a1208;
-          color: #f0ebe0;
-          border: none;
-          border-radius: 100px;
-          padding: 9px 16px;
-          font-size: 13px;
-          font-family: 'DM Sans', sans-serif;
-          font-weight: 500;
+          color: #fff;
+          border: 2px solid #1a1208;
+          padding: 10px 16px;
+          font-size: 16px;
+          font-family: 'Silkscreen', cursive;
           cursor: pointer;
-          transition: background 0.15s, transform 0.1s;
-          white-space: nowrap;
-          flex-shrink: 0;
+          box-shadow: 3px 3px 0px #c9965f;
+          text-transform: uppercase;
         }
-        .mm-send:hover { background: #c9965f; }
-        .mm-send:active { transform: scale(0.96); }
-        .mm-send:disabled { opacity: 0.45; cursor: not-allowed; }
+        .mm-send:hover { background: #332411; }
+        .mm-send:active { transform: translate(3px, 3px); box-shadow: none; }
+        .mm-send:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; transform: none; }
 
         .mm-powered {
           text-align: center;
-          font-size: 10px;
-          color: #b0a898;
-          padding: 5px 0 6px;
-          background: #fff;
-          letter-spacing: 0.04em;
+          font-size: 14px;
+          color: #1a1208;
+          padding: 6px 0 8px;
+          background: #faf8f4;
+          font-family: 'VT323', monospace;
         }
-        .mm-powered span { color: #c9965f; font-weight: 500; }
       `}</style>
 
       <div className="mm-widget">
         <div className="mm-header">
           <div className="mm-header-left">
-            <div className="mm-avatar">🍽️</div>
+            <div className="mm-avatar">👾</div>
             <div>
               <p className="mm-title">MenuMind</p>
-              <p className="mm-subtitle">AI menu assistant · online</p>
+              <p className="mm-subtitle">LVL 1 AI</p>
             </div>
           </div>
           {onClose && (
             <button className="mm-close" onClick={onClose} aria-label="Close">
-              ✕
+              X
             </button>
           )}
         </div>
@@ -300,7 +297,7 @@ export default function ChatWidget({ onClose }) {
               onClick={() => sendMessage(chip.label)}
               disabled={loading}
             >
-              <span style={{ fontSize: 12 }}>{chip.icon}</span>
+              <span>{chip.icon}</span>
               {chip.label}
             </button>
           ))}
@@ -312,7 +309,7 @@ export default function ChatWidget({ onClose }) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && sendMessage(input)}
-            placeholder="Ask about our menu…"
+            placeholder="INSERT COIN... OR QUESTION"
             disabled={loading}
           />
           <button
@@ -320,12 +317,12 @@ export default function ChatWidget({ onClose }) {
             onClick={() => sendMessage(input)}
             disabled={loading || !input.trim()}
           >
-            Send
+            A
           </button>
         </div>
 
         <div className="mm-powered">
-          Powered by <span>MenuMind AI</span>
+          POWERED BY MENUMIND AI
         </div>
       </div>
     </>
