@@ -10,7 +10,7 @@ from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 CORS(app)
-
+gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 client = Perplexity(
     api_key=os.getenv("PERPLEXITY_API_KEY")
 )
@@ -126,7 +126,8 @@ def get_answer(user_message):
 
 @app.route("/api/upload-menu", methods=["POST"])
 def upload_menu():
-    # "file" should match the name of the field in your frontend form / fetch
+    global menu # Tell Python we are modifying the global menu variable
+    
     if "file" not in request.files:
         return jsonify({"error": "No file part"}), 400
 
@@ -134,20 +135,44 @@ def upload_menu():
     if file.filename == "":
         return jsonify({"error": "No selected file"}), 400
 
-    # You can either save then open, or open directly from the file object.
-    # Directly from file object:
-    with pdfplumber.open(file) as pdf:
-        first_page = pdf.pages[0]
-        # Example: inspect first char or text
-        first_char = first_page.chars[0] if first_page.chars else None
-        first_text = first_page.extract_text()
+    try:
+        file_bytes = file.read()
+        # Gemini accepts native PDFs and images
+        mime_type = "application/pdf" if file.filename.lower().endswith(".pdf") else "image/jpeg"
 
-    # For now just return something simple
-    return jsonify({
-        "status": "ok",
-        "first_char": first_char,
-        "first_page_text_preview": first_text[:200] if first_text else None,
-    })
+        prompt = """
+        Read this restaurant menu. Extract all dishes into a valid JSON array.
+        Each dish must be an object with exactly these keys:
+        - "name" (string)
+        - "price" (number)
+        - "category" (string, e.g. "Vegan", "Pasta", "Pizza", "Seafood")
+        - "allergens" (array of strings, e.g. ["nuts", "gluten"])
+        - "description" (string)
+        Output ONLY the raw JSON array. No markdown, no codeblocks, no explanations.
+        """
+
+        resp = gemini_client.models.generate_content(
+            model="gemini-2.0-flash", 
+            contents=[prompt, types.Part.from_bytes(data=file_bytes, mime_type=mime_type)]
+        )
+
+        # Clean output in case Gemini adds ```json
+        raw_text = resp.text.strip()
+        if raw_text.startswith("```json"): raw_text = raw_text[7:-3].strip()
+        elif raw_text.startswith("```"): raw_text = raw_text[3:-3].strip()
+
+        # Parse JSON and update the global menu!
+        extracted_dishes = json.loads(raw_text)
+        menu = extracted_dishes 
+
+        return jsonify({
+            "status": "ok", 
+            "message": f"Successfully loaded {len(menu)} dishes!",
+            "menu": menu
+        })
+    except Exception as e:
+        print("Upload Error:", e)
+        return jsonify({"error": "Failed to parse menu: " + str(e)}), 50
     
 @app.route("/api/chat", methods=["POST"])
 def chat():
