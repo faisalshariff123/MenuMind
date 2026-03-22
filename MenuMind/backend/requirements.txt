@@ -1,12 +1,11 @@
 flask
 flask-cors
 neo4j
-google-generativeai
+google-genai
 requests
 pdfplumber
 python-dotenv
 Pillow
 qrcode
 perplexityai
-pdfplumber
 gunicorn
