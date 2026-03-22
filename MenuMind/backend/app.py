@@ -9,6 +9,8 @@ from werkzeug.utils import secure_filename
 from google import genai
 from google.genai import types
 import json
+from neo4j import GraphDatabase
+
 
 app = Flask(__name__)
 CORS(app)
@@ -49,7 +51,7 @@ def llm_paraphrase(user_message, full_menu):
         return "Whoops! Having some trouble thinking right now."
 
 
-# Hardcoded menu for now — swap with Neo4j later
+# Hardcoded menu for now, swap with Neo4j later
 #menu = [
     #{"name": "Vegan Bowl", "price": 12.50, "category": "Vegan", "allergens": [], "description": "Quinoa, veggies, tofu"},
     #{"name": "Pasta Primavera", "price": 14.00, "category": "Pasta", "allergens": ["gluten"], "description": "Fresh pasta, seasonal vegetables"},
@@ -97,7 +99,7 @@ def upload_menu():
         - "description" (string)
         Output ONLY the raw JSON array. No markdown, no codeblocks, no explanations.
         """
-
+# Teh above code block tells mr. gemini to extract dishes from the menu and return it in a json format
         resp = gemini_client.models.generate_content(
             model="gemini-2.5-flash",
             contents=[
