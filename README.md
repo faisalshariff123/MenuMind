@@ -79,4 +79,4 @@ MenuMind/
 
 ## Team
 
-Built by Faisal Shariff and team at Hack Hayward 2026.
+Built by Faisal Shariff and Syed Rizwanuddin at Hack Hayward 2026.
