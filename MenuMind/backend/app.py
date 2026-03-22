@@ -108,13 +108,27 @@ def save_menu_to_neo4j(restaurant_id, dishes):
 
     with neo4j_driver.session() as session:
         session.execute_write(_tx_save, restaurant_id, dishes)
-# Basic rule-based parsing to find relevant dishes based on user message patterns
+def load_menu_from_neo4j(restaurant_id):
+    with neo4j_driver.session() as session:
+        result = session.run(
+            """
+            MATCH (r:Restaurant {id: $rid})-[:HAS_DISH]->(d:Dish)
+            RETURN d.name AS name,
+                   d.price AS price,
+                   d.category AS category,
+                   d.allergens AS allergens,
+                   d.description AS description
+            """,
+            rid=restaurant_id,
+        )
+        return [dict(record) for record in result]
+
 def get_answer(user_message):
-    return llm_paraphrase(user_message, menu)  # where menu comes from Gemini/Neo4j now
+    return llm_paraphrase(user_message, menu)  
 
 @app.route("/api/upload-menu", methods=["POST"])
 def upload_menu():
-    global menu  # we really are updating the global
+    restaurant_id = request.form.get("restaurant_id", "demo-1")
 
     if "file" not in request.files:
         return jsonify({"error": "No file part"}), 400
