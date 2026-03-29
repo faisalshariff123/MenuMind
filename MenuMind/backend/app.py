@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
 from perplexity import Perplexity
 import os
 from dotenv import load_dotenv
@@ -13,20 +13,9 @@ from neo4j import GraphDatabase
 
 
 app = Flask(__name__)
-CORS(app,
-     origins=["https://menumind-1.onrender.com", "*"],
-     allow_headers=["Content-Type", "Authorization"],
-     methods=["GET", "POST", "OPTIONS"],
-     supports_credentials=False)
+CORS(app, origins="*", allow_headers=["Content-Type"], methods=["GET", "POST", "OPTIONS"])
 
-@app.after_request
-def after_request(response):
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-    return response
 
-# --- Safe client initialization (won't crash on missing env vars) ---
 try:
     gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 except Exception as e:
@@ -161,15 +150,13 @@ def get_answer(user_message, restaurant_id):
     menu = load_menu_from_neo4j(restaurant_id)
     return llm_paraphrase(user_message, menu)
 
-@app.route("/api/upload-menu", methods=["OPTIONS"])
-def upload_menu_preflight():
-    response = jsonify({})
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
-    response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
-    return response, 200
-@app.route("/api/upload-menu", methods=["POST"])
+
+@app.route("/api/upload-menu", methods=["POST", "OPTIONS"])
+@cross_origin(origins="*")
 def upload_menu():
+    if request.method == "OPTIONS":
+        return jsonify({}), 200
+
     if gemini_client is None:
         return jsonify({"error": "Gemini API key not configured on server."}), 500
 
@@ -242,15 +229,13 @@ def upload_menu():
         print("Upload Error:", e)
         return jsonify({"error": "Failed to parse menu: " + str(e)}), 500
 
-@app.route("/api/chat", methods=["OPTIONS"])
-def chat_preflight():
-    response = jsonify({})
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
-    response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
-    return response, 200
-@app.route("/api/chat", methods=["POST"])
+
+@app.route("/api/chat", methods=["POST", "OPTIONS"])
+@cross_origin(origins="*")
 def chat():
+    if request.method == "OPTIONS":
+        return jsonify({}), 200
+
     data = request.get_json()
     user_message = data.get("message", "")
     restaurant_id = data.get("restaurant_id", "demo-1")
