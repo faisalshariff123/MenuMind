@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from flask_cors import CORS, cross_origin
+from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from perplexity import Perplexity
@@ -14,9 +14,10 @@ import json
 from neo4j import GraphDatabase
 
 app = Flask(__name__)
+
 CORS(app, origins="*", allow_headers=["Content-Type"], methods=["GET", "POST", "OPTIONS"])
 
-# Initialize Rate Limiter (using in-memory storage for simplicity; consider Redis for production)
+# Initialize Rate Limiter
 limiter = Limiter(
     get_remote_address,
     app=app,
@@ -48,7 +49,7 @@ except Exception as e:
 
 
 @app.route("/api/health", methods=["GET"])
-@limiter.exempt # Exclude health checks from rate limiting
+@limiter.exempt 
 def health():
     return jsonify({
         "status": "ok",
@@ -160,13 +161,9 @@ def get_answer(user_message, restaurant_id):
     return llm_paraphrase(user_message, menu)
 
 
-@app.route("/api/upload-menu", methods=["POST", "OPTIONS"])
-@cross_origin(origins="*")
-@limiter.limit("5 per minute") 
+@app.route("/api/upload-menu", methods=["POST"])
+@limiter.limit("5 per minute")
 def upload_menu():
-    if request.method == "OPTIONS":
-        return jsonify({}), 200
-
     if gemini_client is None:
         return jsonify({"error": "Gemini API key not configured on server."}), 500
 
@@ -240,13 +237,9 @@ def upload_menu():
         return jsonify({"error": "Failed to parse menu: " + str(e)}), 500
 
 
-@app.route("/api/chat", methods=["POST", "OPTIONS"])
-@cross_origin(origins="*")
-@limiter.limit("20 per minute") 
+@app.route("/api/chat", methods=["POST"])
+@limiter.limit("20 per minute")
 def chat():
-    if request.method == "OPTIONS":
-        return jsonify({}), 200
-
     data = request.get_json()
     user_message = data.get("message", "")
     restaurant_id = data.get("restaurant_id", "demo-1")
@@ -263,7 +256,9 @@ def dishes():
 
 @app.errorhandler(429)
 def ratelimit_handler(e):
-    return jsonify({"error": f"Rate limit exceeded: {e.description}"}), 429
+    response = jsonify({"error": f"Rate limit exceeded: {e.description}"})
+    response.headers.add("Access-Control-Allow-Origin", "*")
+    return response, 429
 
 
 if __name__ == "__main__":
