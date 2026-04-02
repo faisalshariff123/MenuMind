@@ -65,7 +65,7 @@ except Exception as e:
 
 
 @app.route("/api/health", methods=["GET"])
-@limiter.exempt 
+@limiter.exempt
 def health():
     return jsonify({
         "status": "ok",
@@ -177,9 +177,12 @@ def get_answer(user_message, restaurant_id):
     return llm_paraphrase(user_message, menu)
 
 
-@app.route("/api/upload-menu", methods=["POST"])
-@limiter.limit("5 per minute")
+@app.route("/api/upload-menu", methods=["POST", "OPTIONS"])
+@limiter.limit("5 per minute", methods=["POST"])
 def upload_menu():
+    if request.method == "OPTIONS":
+        return jsonify({}), 200
+
     if gemini_client is None:
         return jsonify({"error": "Gemini API key not configured on server."}), 500
 
@@ -253,9 +256,12 @@ def upload_menu():
         return jsonify({"error": "Failed to parse menu: " + str(e)}), 500
 
 
-@app.route("/api/chat", methods=["POST"])
-@limiter.limit("20 per minute")
+@app.route("/api/chat", methods=["POST", "OPTIONS"])
+@limiter.limit("20 per minute", methods=["POST"])
 def chat():
+    if request.method == "OPTIONS":
+        return jsonify({}), 200
+
     data = request.get_json()
     user_message = data.get("message", "")
     restaurant_id = data.get("restaurant_id", "demo-1")
