@@ -1,5 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS, cross_origin
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from perplexity import Perplexity
 import os
 from dotenv import load_dotenv
@@ -11,10 +13,16 @@ from google.genai import types
 import json
 from neo4j import GraphDatabase
 
-
 app = Flask(__name__)
 CORS(app, origins="*", allow_headers=["Content-Type"], methods=["GET", "POST", "OPTIONS"])
 
+# Initialize Rate Limiter (using in-memory storage for simplicity; consider Redis for production)
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://" 
+)
 
 try:
     gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
@@ -40,6 +48,7 @@ except Exception as e:
 
 
 @app.route("/api/health", methods=["GET"])
+@limiter.exempt # Exclude health checks from rate limiting
 def health():
     return jsonify({
         "status": "ok",
@@ -153,6 +162,7 @@ def get_answer(user_message, restaurant_id):
 
 @app.route("/api/upload-menu", methods=["POST", "OPTIONS"])
 @cross_origin(origins="*")
+@limiter.limit("5 per minute") 
 def upload_menu():
     if request.method == "OPTIONS":
         return jsonify({}), 200
@@ -232,6 +242,7 @@ def upload_menu():
 
 @app.route("/api/chat", methods=["POST", "OPTIONS"])
 @cross_origin(origins="*")
+@limiter.limit("20 per minute") 
 def chat():
     if request.method == "OPTIONS":
         return jsonify({}), 200
@@ -248,6 +259,11 @@ def dishes():
     restaurant_id = request.args.get("restaurant_id", "demo-1")
     menu = load_menu_from_neo4j(restaurant_id)
     return jsonify(menu)
+
+
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return jsonify({"error": f"Rate limit exceeded: {e.description}"}), 429
 
 
 if __name__ == "__main__":
