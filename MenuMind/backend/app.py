@@ -15,7 +15,23 @@ from neo4j import GraphDatabase
 
 app = Flask(__name__)
 
-CORS(app, origins="*", allow_headers=["Content-Type"], methods=["GET", "POST", "OPTIONS"])
+CORS(app, resources={r"/api/*": {"origins": "*"}})
+
+@app.after_request
+def add_cors_headers(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    return response
+
+@app.before_request
+def handle_preflight():
+    if request.method == "OPTIONS":
+        res = app.make_default_options_response()
+        res.headers["Access-Control-Allow-Origin"] = "*"
+        res.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        res.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        return res
 
 # Initialize Rate Limiter
 limiter = Limiter(
@@ -256,9 +272,7 @@ def dishes():
 
 @app.errorhandler(429)
 def ratelimit_handler(e):
-    response = jsonify({"error": f"Rate limit exceeded: {e.description}"})
-    response.headers.add("Access-Control-Allow-Origin", "*")
-    return response, 429
+    return jsonify({"error": f"Rate limit exceeded: {e.description}"}), 429
 
 
 if __name__ == "__main__":
